@@ -32,7 +32,7 @@ const upload = multer({
 });
 
 router.get('/', authMiddleware, (req, res) => {
-  const { page = 1, pageSize = 10, keyword, category, box_id, status, expire_soon, low_stock } = req.query;
+  const { page = 1, pageSize = 10, keyword, category, box_id, status, expire_soon, low_stock, need_restock } = req.query;
   const db = getDb();
   const userId = req.user.id;
 
@@ -64,7 +64,11 @@ router.get('/', authMiddleware, (req, res) => {
   }
 
   if (low_stock === 'true') {
-    whereClause += ' AND i.quantity <= 2';
+    whereClause += ' AND i.quantity <= COALESCE(NULLIF(i.min_stock, 0), 2)';
+  }
+
+  if (need_restock === 'true') {
+    whereClause += ' AND i.need_restock = 1';
   }
 
   const total = db.prepare(`SELECT COUNT(*) as count FROM items i ${whereClause}`).get(...params).count;
@@ -170,26 +174,32 @@ router.post('/upload', authMiddleware, upload.single('image'), (req, res) => {
 });
 
 router.post('/', authMiddleware, (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, image } = req.body;
+  const { name, box_id, category, quantity, unit, expire_date, description, image, min_stock } = req.body;
   const db = getDb();
 
   if (!name) {
     return res.status(400).json({ message: '物品名称不能为空' });
   }
 
+  const qty = quantity || 1;
+  const minStock = min_stock || 0;
+  const needRestock = qty <= minStock && minStock > 0 ? 1 : 0;
+
   const result = db.prepare(`
-    INSERT INTO items (user_id, box_id, name, category, quantity, unit, expire_date, description, image)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO items (user_id, box_id, name, category, quantity, unit, expire_date, description, image, min_stock, need_restock)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.user.id,
     box_id || null,
     name,
     category || '',
-    quantity || 1,
+    qty,
     unit || '个',
     expire_date || null,
     description || '',
-    image || null
+    image || null,
+    minStock,
+    needRestock
   );
 
   const item = db.prepare('SELECT * FROM items WHERE id = ?').get(result.lastInsertRowid);
@@ -197,7 +207,7 @@ router.post('/', authMiddleware, (req, res) => {
 });
 
 router.put('/:id', authMiddleware, (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, status, image } = req.body;
+  const { name, box_id, category, quantity, unit, expire_date, description, status, image, min_stock } = req.body;
   const db = getDb();
   const itemId = req.params.id;
 
@@ -206,20 +216,26 @@ router.put('/:id', authMiddleware, (req, res) => {
     return res.status(404).json({ message: '物品不存在' });
   }
 
+  const qty = quantity || 1;
+  const minStock = min_stock || 0;
+  const needRestock = qty <= minStock && minStock > 0 ? 1 : 0;
+
   db.prepare(`
     UPDATE items 
-    SET name = ?, box_id = ?, category = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, box_id = ?, category = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, min_stock = ?, need_restock = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND user_id = ?
   `).run(
     name,
     box_id || null,
     category || '',
-    quantity || 1,
+    qty,
     unit || '个',
     expire_date || null,
     description || '',
     status || 'stored',
     image || null,
+    minStock,
+    needRestock,
     itemId,
     req.user.id
   );

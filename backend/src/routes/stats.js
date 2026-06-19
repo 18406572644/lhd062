@@ -28,6 +28,12 @@ router.get('/overview', authMiddleware, (req, res) => {
       AND expire_date < date('now')
   `).get(userId).count;
 
+  const lowStockCount = db.prepare(`
+    SELECT COUNT(*) as count FROM items 
+    WHERE user_id = ? 
+      AND need_restock = 1
+  `).get(userId).count;
+
   let totalVolume = 0;
   const boxes = db.prepare('SELECT width, height, depth FROM boxes WHERE user_id = ?').all(userId);
   boxes.forEach(b => {
@@ -42,6 +48,7 @@ router.get('/overview', authMiddleware, (req, res) => {
     stored_count: storedCount,
     expire_soon_count: expireSoonCount,
     expired_count: expiredCount,
+    low_stock_count: lowStockCount,
     total_volume: Math.round(totalVolume)
   });
 });

@@ -38,6 +38,17 @@
       </el-col>
     </el-row>
 
+    <el-row :gutter="20" class="stat-cards" style="margin-top: 0;">
+      <el-col :span="6">
+        <div class="stat-card danger clickable" @click="goToItems('need_restock')">
+          <div class="stat-icon">🔔</div>
+          <div class="stat-value">{{ stats.low_stock_count || 0 }}</div>
+          <div class="stat-label">待补货物品</div>
+          <div class="stat-hint">点击查看 →</div>
+        </div>
+      </el-col>
+    </el-row>
+
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
         <el-card class="chart-card">
@@ -98,10 +109,12 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { getOverview, getByCategory, getByBox, getRecordTrend } from '@/api/stats'
 import { getRecordStats } from '@/api/records'
 import * as echarts from 'echarts'
 
+const router = useRouter()
 const stats = ref({})
 const categoryChartRef = ref(null)
 const boxChartRef = ref(null)
@@ -119,6 +132,14 @@ function formatTime(time) {
   const hour = date.getHours().toString().padStart(2, '0')
   const minute = date.getMinutes().toString().padStart(2, '0')
   return `${month}月${day}日 ${hour}:${minute}`
+}
+
+function goToItems(filterType) {
+  const query = {}
+  if (filterType === 'need_restock') {
+    query.need_restock = 'true'
+  }
+  router.push({ name: 'Items', query })
 }
 
 async function loadStats() {
@@ -244,6 +265,67 @@ onMounted(() => {
 <style scoped>
 .stat-cards {
   margin-bottom: 20px;
+}
+
+.stat-card {
+  padding: 20px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.stat-card.green {
+  background: linear-gradient(135deg, #B8D8BA 0%, #8FC493 100%);
+}
+
+.stat-card.brown {
+  background: linear-gradient(135deg, #D4B896 0%, #B8956E 100%);
+}
+
+.stat-card.cream {
+  background: linear-gradient(135deg, #F5E6C8 0%, #E8D4A8 100%);
+}
+
+.stat-card.warning {
+  background: linear-gradient(135deg, #FFE0B2 0%, #FFCC80 100%);
+}
+
+.stat-card.danger {
+  background: linear-gradient(135deg, #FFCDD2 0%, #EF9A9A 100%);
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #5D4E37;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #5D4E37;
+  opacity: 0.85;
+}
+
+.stat-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #5D4E37;
+  opacity: 0.7;
+  font-weight: 500;
 }
 
 .chart-card {

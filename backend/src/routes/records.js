@@ -75,12 +75,14 @@ router.post('/borrow', authMiddleware, (req, res) => {
 
   const newQty = Math.max(0, item.quantity - borrowQty);
   const newStatus = newQty <= 0 ? 'borrowed' : item.status;
+  const minStock = item.min_stock || 0;
+  const needRestock = newQty <= minStock && minStock > 0 ? 1 : 0;
   
   db.prepare(`
     UPDATE items 
-    SET quantity = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+    SET quantity = ?, status = ?, need_restock = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(newQty, newStatus, item_id);
+  `).run(newQty, newStatus, needRestock, item_id);
 
   const record = db.prepare(`
     SELECT r.*, i.name as item_name
@@ -114,12 +116,14 @@ router.post('/return', authMiddleware, (req, res) => {
   `).run(userId, item_id, returnQty, remark || '');
 
   const newQty = item.quantity + returnQty;
+  const minStock = item.min_stock || 0;
+  const needRestock = newQty <= minStock && minStock > 0 ? 1 : 0;
   
   db.prepare(`
     UPDATE items 
-    SET quantity = ?, status = 'stored', updated_at = CURRENT_TIMESTAMP
+    SET quantity = ?, status = 'stored', need_restock = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(newQty, item_id);
+  `).run(newQty, needRestock, item_id);
 
   const record = db.prepare(`
     SELECT r.*, i.name as item_name

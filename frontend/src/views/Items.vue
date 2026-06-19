@@ -7,6 +7,13 @@
       </h2>
       <div class="header-actions">
         <el-button
+          type="danger"
+          :icon="ShoppingCart"
+          @click="generateRestockList"
+        >
+          生成补货清单
+        </el-button>
+        <el-button
           type="warning"
           :icon="ShoppingCart"
           :disabled="selectedItems.length === 0"
@@ -22,6 +29,14 @@
         </el-button>
       </div>
     </div>
+
+    <el-tabs v-model="activeTab" class="filter-tabs" @tab-change="handleTabChange">
+      <el-tab-pane label="全部物品" name="all" />
+      <el-tab-pane label="在库" name="stored" />
+      <el-tab-pane label="已取用" name="borrowed" />
+      <el-tab-pane label="即将过期" name="expire_soon" />
+      <el-tab-pane :label="restockTabLabel" name="need_restock" />
+    </el-tabs>
 
     <el-card class="filter-card">
       <el-form :inline="true" :model="filters">
@@ -107,9 +122,21 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="物品名称" min-width="150">
+        <el-table-column prop="name" label="物品名称" min-width="180">
           <template #default="{ row }">
-            <span class="item-name">{{ row.name }}</span>
+            <div class="item-name-wrapper">
+              <span class="item-name">{{ row.name }}</span>
+              <el-tag
+                v-if="row.need_restock === 1 || row.need_restock === true"
+                size="small"
+                type="danger"
+                effect="dark"
+                class="restock-tag"
+              >
+                <el-icon><Warning /></el-icon>
+                待补货
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="category" label="分类" width="100">
@@ -128,9 +155,16 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="数量" width="100">
+        <el-table-column label="数量" width="140">
           <template #default="{ row }">
-            {{ row.quantity }} {{ row.unit }}
+            <div class="qty-wrapper">
+              <span :class="{ 'qty-low': isLowStock(row) }">
+                {{ row.quantity }} {{ row.unit }}
+              </span>
+              <span v-if="row.min_stock > 0" class="min-stock-info">
+                (阈值: {{ row.min_stock }})
+              </span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -242,6 +276,12 @@
           <el-input-number v-model="form.quantity" :min="0" />
           <span style="margin-left: 8px">
             <el-input v-model="form.unit" placeholder="单位" style="width: 80px" />
+          </span>
+        </el-form-item>
+        <el-form-item label="最小库存">
+          <el-input-number v-model="form.min_stock" :min="0" />
+          <span style="margin-left: 8px; color: var(--color-text-light); font-size: 12px">
+            当数量 ≤ 此值时自动标记待补货，0 表示不启用
           </span>
         </el-form-item>
         <el-form-item label="过期日期">
@@ -378,6 +418,23 @@
             </div>
           </el-descriptions-item>
           <el-descriptions-item label="数量">{{ currentItem.quantity }} {{ currentItem.unit }}</el-descriptions-item>
+          <el-descriptions-item label="最小库存">
+            <span v-if="currentItem.min_stock > 0">{{ currentItem.min_stock }} {{ currentItem.unit }}</span>
+            <span v-else class="text-light">未设置</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="补货状态">
+            <el-tag
+              v-if="currentItem.need_restock === 1 || currentItem.need_restock === true"
+              size="small"
+              type="danger"
+              effect="dark"
+            >
+              待补货
+            </el-tag>
+            <el-tag v-else size="small" type="success">
+              库存正常
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="currentItem.status === 'stored' ? 'success' : 'warning'" size="small">
               {{ currentItem.status === 'stored' ? '在库' : '已取用' }}
@@ -417,15 +474,16 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowDown, Location, ShoppingCart, Picture, PictureFilled, Close, ZoomIn } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, Location, ShoppingCart, Picture, PictureFilled, Close, ZoomIn, Warning } from '@element-plus/icons-vue'
 import { getItemList, getCategories, createItem, updateItem, deleteItem, uploadItemImage } from '@/api/items'
 import { getAllBoxes } from '@/api/boxes'
 import { borrowItem, returnItem } from '@/api/records'
 import { getShoppingLists, addFromLowStock, createShoppingList } from '@/api/shopping'
 
 const route = useRoute()
+const router = useRouter()
 const formRef = ref()
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -434,6 +492,9 @@ const isEdit = ref(false)
 const items = ref([])
 const categories = ref([])
 const boxList = ref([])
+
+const activeTab = ref('all')
+const restockCount = ref(0)
 
 const detailDialogVisible = ref(false)
 const currentItem = ref(null)
@@ -465,7 +526,8 @@ const filters = reactive({
   box_id: '',
   status: '',
   expire_soon: false,
-  low_stock: ''
+  low_stock: '',
+  need_restock: false
 })
 
 const pagination = reactive({
@@ -481,6 +543,7 @@ const form = reactive({
   category: '',
   quantity: 1,
   unit: '个',
+  min_stock: 0,
   expire_date: '',
   description: '',
   image: ''
@@ -493,6 +556,41 @@ const rules = {
 const storedItems = computed(() => {
   return items.value.filter(item => item.status === 'stored' && item.quantity > 0)
 })
+
+const restockTabLabel = computed(() => {
+  return restockCount.value > 0 ? `待补货 (${restockCount.value})` : '待补货'
+})
+
+function isLowStock(item) {
+  if (item.min_stock && item.min_stock > 0) {
+    return item.quantity <= item.min_stock
+  }
+  return item.quantity <= 2
+}
+
+function handleTabChange(tab) {
+  filters.status = ''
+  filters.expire_soon = false
+  filters.low_stock = ''
+  filters.need_restock = false
+
+  switch (tab) {
+    case 'stored':
+      filters.status = 'stored'
+      break
+    case 'borrowed':
+      filters.status = 'borrowed'
+      break
+    case 'expire_soon':
+      filters.expire_soon = true
+      break
+    case 'need_restock':
+      filters.need_restock = true
+      break
+  }
+  pagination.page = 1
+  loadList()
+}
 
 function isExpireSoon(item) {
   if (!item.expire_date) return false
@@ -513,14 +611,33 @@ async function loadList() {
       box_id: filters.box_id || undefined,
       status: filters.status || undefined,
       expire_soon: filters.expire_soon || undefined,
-      low_stock: filters.low_stock === 'low' ? true : undefined
+      low_stock: filters.low_stock === 'low' ? true : undefined,
+      need_restock: filters.need_restock ? true : undefined
     }
     const res = await getItemList(params)
     items.value = res.list
     pagination.total = res.total
     selectedItems.value = []
+    
+    if (activeTab.value === 'all') {
+      loadRestockCount()
+    }
   } finally {
     loading.value = false
+  }
+}
+
+async function loadRestockCount() {
+  try {
+    const params = {
+      page: 1,
+      pageSize: 1,
+      need_restock: true
+    }
+    const res = await getItemList(params)
+    restockCount.value = res.total
+  } catch (e) {
+    console.error(e)
   }
 }
 
@@ -541,6 +658,8 @@ function resetFilters() {
   filters.status = ''
   filters.expire_soon = false
   filters.low_stock = ''
+  filters.need_restock = false
+  activeTab.value = 'all'
   pagination.page = 1
   loadList()
 }
@@ -605,6 +724,7 @@ function handleEdit(item) {
   form.category = item.category
   form.quantity = item.quantity
   form.unit = item.unit || '个'
+  form.min_stock = item.min_stock || 0
   form.expire_date = item.expire_date
   form.description = item.description
   form.image = item.image || ''
@@ -619,6 +739,7 @@ function resetForm() {
   form.category = ''
   form.quantity = 1
   form.unit = '个'
+  form.min_stock = 0
   form.expire_date = ''
   form.description = ''
   form.image = ''
@@ -804,12 +925,99 @@ async function confirmAddToList() {
   }
 }
 
+async function generateRestockList() {
+  try {
+    const params = {
+      page: 1,
+      pageSize: 1000,
+      need_restock: true
+    }
+    const res = await getItemList(params)
+    const restockItems = res.list
+    
+    if (restockItems.length === 0) {
+      ElMessage.info('当前没有需要补货的物品')
+      return
+    }
+    
+    const action = await ElMessageBox.confirm(
+      `共找到 ${restockItems.length} 个需要补货的物品，请选择操作方式：`,
+      '生成补货清单',
+      {
+        confirmButtonText: '复制到剪贴板',
+        cancelButtonText: '导出文本文件',
+        distinguishCancelAndClose: true,
+        type: 'info'
+      }
+    ).catch(() => 'export')
+
+    let content = '===== 补货清单 =====\n'
+    content += `生成时间: ${new Date().toLocaleString()}\n`
+    content += `物品数量: ${restockItems.length}\n\n`
+    
+    restockItems.forEach((item, idx) => {
+      const suggestQty = Math.max(
+        (item.min_stock || 0) * 2 - item.quantity,
+        (item.min_stock || 0) - item.quantity,
+        1
+      )
+      content += `${idx + 1}. ${item.name}\n`
+      content += `   当前库存: ${item.quantity}${item.unit || '个'}\n`
+      content += `   最小阈值: ${item.min_stock || 0}${item.unit || '个'}\n`
+      content += `   建议补货: ${suggestQty}${item.unit || '个'}\n`
+      if (item.box_name) {
+        content += `   存放位置: ${item.box_name}${item.box_location ? ' (' + item.box_location + ')' : ''}\n`
+      }
+      if (item.category) {
+        content += `   分类: ${item.category}\n`
+      }
+      content += '\n'
+    })
+
+    if (action === 'confirm') {
+      await navigator.clipboard.writeText(content)
+      ElMessage.success('补货清单已复制到剪贴板')
+    } else {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `补货清单_${new Date().toISOString().slice(0, 10)}.txt`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      ElMessage.success('补货清单已导出')
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('生成补货清单失败')
+  }
+}
+
 onMounted(() => {
   if (route.query.keyword) {
     filters.keyword = route.query.keyword
   }
   if (route.query.box_id) {
     filters.box_id = route.query.box_id
+  }
+  if (route.query.need_restock === 'true') {
+    activeTab.value = 'need_restock'
+    filters.need_restock = true
+  }
+  if (route.query.status) {
+    if (route.query.status === 'stored') {
+      activeTab.value = 'stored'
+      filters.status = 'stored'
+    } else if (route.query.status === 'borrowed') {
+      activeTab.value = 'borrowed'
+      filters.status = 'borrowed'
+    }
+  }
+  if (route.query.expire_soon === 'true') {
+    activeTab.value = 'expire_soon'
+    filters.expire_soon = true
   }
   loadCategories()
   loadBoxes()
@@ -819,9 +1027,49 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.filter-tabs {
+  margin-bottom: 16px;
+}
+
 .header-actions {
   display: flex;
   gap: 12px;
+}
+
+.item-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.restock-tag {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.qty-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qty-low {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.min-stock-info {
+  font-size: 12px;
+  color: var(--color-text-light);
 }
 
 .item-name {

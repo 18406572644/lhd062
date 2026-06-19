@@ -25,6 +25,16 @@ function migrateTables() {
     db.exec('ALTER TABLE items ADD COLUMN image TEXT');
     console.log('迁移完成：items 表已添加 image 列');
   }
+  const hasMinStock = columns.some(col => col.name === 'min_stock');
+  if (!hasMinStock) {
+    db.exec('ALTER TABLE items ADD COLUMN min_stock INTEGER DEFAULT 0');
+    console.log('迁移完成：items 表已添加 min_stock 列');
+  }
+  const hasNeedRestock = columns.some(col => col.name === 'need_restock');
+  if (!hasNeedRestock) {
+    db.exec('ALTER TABLE items ADD COLUMN need_restock INTEGER DEFAULT 0');
+    console.log('迁移完成：items 表已添加 need_restock 列');
+  }
 }
 
 function createTables() {
@@ -65,6 +75,8 @@ function createTables() {
       description TEXT,
       image TEXT,
       status TEXT DEFAULT 'stored',
+      min_stock INTEGER DEFAULT 0,
+      need_restock INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
