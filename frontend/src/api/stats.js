@@ -73,3 +73,10 @@ export function getSmartSuggestions(days = 30) {
     params: { days }
   })
 }
+
+export function getDashboardData() {
+  return request({
+    url: '/stats/dashboard',
+    method: 'get'
+  })
+}

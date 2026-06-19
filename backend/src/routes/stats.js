@@ -42,6 +42,11 @@ router.get('/overview', authMiddleware, (req, res) => {
     }
   });
 
+  const totalValue = db.prepare(`
+    SELECT COALESCE(SUM(estimated_value * quantity), 0) as total_value
+    FROM items WHERE user_id = ?
+  `).get(userId).total_value;
+
   res.json({
     box_count: boxCount,
     item_count: itemCount,
@@ -49,7 +54,8 @@ router.get('/overview', authMiddleware, (req, res) => {
     expire_soon_count: expireSoonCount,
     expired_count: expiredCount,
     low_stock_count: lowStockCount,
-    total_volume: Math.round(totalVolume)
+    total_volume: Math.round(totalVolume),
+    total_value: Math.round(totalValue * 100) / 100
   });
 });
 
@@ -61,7 +67,8 @@ router.get('/by-category', authMiddleware, (req, res) => {
     SELECT 
       COALESCE(NULLIF(category, ''), '未分类') as category,
       COUNT(*) as count,
-      SUM(quantity) as total_quantity
+      SUM(quantity) as total_quantity,
+      COALESCE(SUM(estimated_value * quantity), 0) as total_value
     FROM items 
     WHERE user_id = ?
     GROUP BY category
@@ -594,6 +601,160 @@ router.get('/smart-suggestions', authMiddleware, (req, res) => {
   res.json({
     suggestions,
     days: parseInt(days)
+  });
+});
+
+router.get('/dashboard', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.id;
+
+  const overview = db.prepare(`
+    SELECT 
+      (SELECT COUNT(*) FROM boxes WHERE user_id = ?) as box_count,
+      (SELECT COUNT(*) FROM items WHERE user_id = ?) as item_count,
+      (SELECT COUNT(*) FROM items WHERE user_id = ? AND status = 'stored') as stored_count,
+      (SELECT COALESCE(SUM(estimated_value * quantity), 0) FROM items WHERE user_id = ?) as total_value,
+      (SELECT COUNT(*) FROM items WHERE user_id = ? AND need_restock = 1) as low_stock_count,
+      (SELECT COUNT(*) FROM items WHERE user_id = ? AND status = 'stored' AND expire_date IS NOT NULL AND expire_date != '' AND expire_date <= date('now', '+30 days') AND expire_date >= date('now')) as expire_soon_count
+  `).get(userId, userId, userId, userId, userId, userId);
+
+  const locationStats = db.prepare(`
+    SELECT 
+      COALESCE(NULLIF(b.location, ''), '未指定位置') as location,
+      COUNT(DISTINCT b.id) as box_count,
+      COUNT(i.id) as item_count,
+      COALESCE(SUM(i.estimated_value * i.quantity), 0) as total_value
+    FROM boxes b
+    LEFT JOIN items i ON b.id = i.box_id
+    WHERE b.user_id = ?
+    GROUP BY b.location
+    ORDER BY box_count DESC
+  `).all(userId);
+
+  const categoryValue = db.prepare(`
+    SELECT 
+      COALESCE(NULLIF(category, ''), '未分类') as category,
+      COUNT(*) as count,
+      COALESCE(SUM(estimated_value * quantity), 0) as total_value
+    FROM items 
+    WHERE user_id = ?
+    GROUP BY category
+    ORDER BY total_value DESC
+  `).all(userId);
+
+  const boxes3d = db.prepare(`
+    SELECT 
+      b.id,
+      b.name,
+      b.location,
+      b.color,
+      b.width,
+      b.height,
+      b.depth,
+      COUNT(i.id) as item_count,
+      COALESCE(SUM(i.estimated_value * i.quantity), 0) as total_value
+    FROM boxes b
+    LEFT JOIN items i ON b.id = i.box_id
+    WHERE b.user_id = ?
+    GROUP BY b.id
+    ORDER BY b.created_at DESC
+  `).all(userId);
+
+  const recentRecords = db.prepare(`
+    SELECT 
+      r.id,
+      r.type,
+      r.quantity,
+      r.created_at,
+      i.name as item_name,
+      i.unit as item_unit,
+      b.name as box_name
+    FROM records r
+    LEFT JOIN items i ON r.item_id = i.id
+    LEFT JOIN boxes b ON i.box_id = b.id
+    WHERE r.user_id = ?
+    ORDER BY r.created_at DESC
+    LIMIT 20
+  `).all(userId);
+
+  const expiringItems = db.prepare(`
+    SELECT 
+      i.id,
+      i.name,
+      i.expire_date,
+      i.quantity,
+      i.unit,
+      b.name as box_name,
+      CAST(julianday(i.expire_date) - julianday(date('now')) AS INTEGER) as days_left
+    FROM items i
+    LEFT JOIN boxes b ON i.box_id = b.id
+    WHERE i.user_id = ? 
+      AND i.expire_date IS NOT NULL 
+      AND i.expire_date != ''
+      AND i.status = 'stored'
+      AND i.expire_date <= date('now', '+30 days')
+    ORDER BY i.expire_date ASC
+    LIMIT 10
+  `).all(userId);
+
+  const lowStockItems = db.prepare(`
+    SELECT 
+      i.id,
+      i.name,
+      i.quantity,
+      i.unit,
+      i.min_stock,
+      b.name as box_name,
+      i.category
+    FROM items i
+    LEFT JOIN boxes b ON i.box_id = b.id
+    WHERE i.user_id = ? 
+      AND i.need_restock = 1
+    ORDER BY i.quantity ASC
+    LIMIT 10
+  `).all(userId);
+
+  const trend30 = [];
+  for (let i = 29; i >= 0; i--) {
+    const date = db.prepare(`SELECT date('now', '-' || ? || ' days') as date`).get(i).date;
+    
+    const borrowCount = db.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(quantity), 0) as total_qty
+      FROM records 
+      WHERE user_id = ? AND type = 'borrow' AND date(created_at) = ?
+    `).get(userId, date);
+
+    const returnCount = db.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(quantity), 0) as total_qty
+      FROM records 
+      WHERE user_id = ? AND type = 'return' AND date(created_at) = ?
+    `).get(userId, date);
+
+    trend30.push({
+      date,
+      borrow: borrowCount.count,
+      borrow_qty: borrowCount.total_qty,
+      return: returnCount.count,
+      return_qty: returnCount.total_qty
+    });
+  }
+
+  res.json({
+    overview: {
+      box_count: overview.box_count,
+      item_count: overview.item_count,
+      stored_count: overview.stored_count,
+      total_value: Math.round(overview.total_value * 100) / 100,
+      low_stock_count: overview.low_stock_count,
+      expire_soon_count: overview.expire_soon_count
+    },
+    location_stats: locationStats,
+    category_value: categoryValue,
+    boxes_3d: boxes3d,
+    recent_records: recentRecords,
+    expiring_items: expiringItems,
+    low_stock_items: lowStockItems,
+    trend_30: trend30
   });
 });
 

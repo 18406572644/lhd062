@@ -298,6 +298,12 @@
             cm³，用于空间利用率计算（选填）
           </span>
         </el-form-item>
+        <el-form-item label="估值">
+          <el-input-number v-model="form.estimated_value" :min="0" :precision="2" :step="10" />
+          <span style="margin-left: 8px; color: var(--color-text-light); font-size: 12px">
+            元，用于资产价值统计（选填）
+          </span>
+        </el-form-item>
         <el-form-item label="描述">
           <el-input
             v-model="form.description"
@@ -553,6 +559,7 @@ const form = reactive({
   min_stock: 0,
   expire_date: '',
   estimated_size: 0,
+  estimated_value: 0,
   description: '',
   image: ''
 })
@@ -757,6 +764,7 @@ function handleEdit(item) {
   form.min_stock = item.min_stock || 0
   form.expire_date = item.expire_date
   form.estimated_size = item.estimated_size || 0
+  form.estimated_value = item.estimated_value || 0
   form.description = item.description
   form.image = item.image || ''
   dialogVisible.value = true
@@ -773,6 +781,7 @@ function resetForm() {
   form.min_stock = 0
   form.expire_date = ''
   form.estimated_size = 0
+  form.estimated_value = 0
   form.description = ''
   form.image = ''
 }

@@ -78,6 +78,12 @@ const routes = [
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),
         meta: { title: '个人中心', icon: 'User', hidden: true }
+      },
+      {
+        path: 'data-dashboard',
+        name: 'DataDashboard',
+        component: () => import('@/views/DataDashboard.vue'),
+        meta: { title: '数据大屏', icon: 'DataLine', hidden: true }
       }
     ]
   }

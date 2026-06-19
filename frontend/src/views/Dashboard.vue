@@ -7,6 +7,12 @@
             <el-icon><HomeFilled /></el-icon>
             首页概览
           </h2>
+          <div class="header-actions">
+            <el-button type="primary" :icon="DataLine" @click="goToDataDashboard">
+              <el-icon><FullScreen /></el-icon>
+              数据大屏
+            </el-button>
+          </div>
         </div>
 
         <el-row :gutter="20" class="stat-cards">
@@ -347,8 +353,13 @@ import {
 } from '@/api/stats'
 import { getRecordStats } from '@/api/records'
 import * as echarts from 'echarts'
+import { DataLine, FullScreen } from '@element-plus/icons-vue'
 
 const router = useRouter()
+
+function goToDataDashboard() {
+  router.push('/data-dashboard')
+}
 const activeTab = ref('overview')
 
 const stats = ref({})
@@ -995,6 +1006,9 @@ onMounted(() => {
 
 .page-header {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .page-title {
@@ -1004,6 +1018,11 @@ onMounted(() => {
   color: var(--color-brown-dark);
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.header-actions {
+  display: flex;
   gap: 10px;
 }
 </style>
