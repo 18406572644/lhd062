@@ -10,6 +10,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const authRoutes = require('./routes/auth');
+const familyRoutes = require('./routes/families');
 const boxRoutes = require('./routes/boxes');
 const itemRoutes = require('./routes/items');
 const labelRoutes = require('./routes/labels');
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/families', familyRoutes);
 app.use('/api/boxes', boxRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/labels', labelRoutes);

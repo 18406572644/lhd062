@@ -84,6 +84,18 @@ const routes = [
         name: 'DataDashboard',
         component: () => import('@/views/DataDashboard.vue'),
         meta: { title: '数据大屏', icon: 'DataLine', hidden: true }
+      },
+      {
+        path: 'families',
+        name: 'Families',
+        component: () => import('@/views/Families.vue'),
+        meta: { title: '家庭管理', icon: 'HomeFilled', hidden: true }
+      },
+      {
+        path: 'families/:id',
+        name: 'FamilyDetail',
+        component: () => import('@/views/FamilyDetail.vue'),
+        meta: { title: '家庭详情', icon: 'HomeFilled', hidden: true }
       }
     ]
   }

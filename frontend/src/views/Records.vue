@@ -78,12 +78,24 @@
           </template>
         </el-table-column>
         <el-table-column prop="item_name" label="物品名称" min-width="150" />
-        <el-table-column label="数量" width="120">
+        <el-table-column label="数量" width="100">
           <template #default="{ row }">
             {{ row.quantity }} {{ row.item_unit || '' }}
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="150">
+        <el-table-column prop="operator_name" label="操作人" width="120">
+          <template #default="{ row }">
+            <span v-if="row.operator_name">{{ row.operator_name }}</span>
+            <span v-else class="text-light">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="空间" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.space_type === 'family'" type="warning" size="small">家庭</el-tag>
+            <el-tag v-else type="info" size="small">私人</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="120">
           <template #default="{ row }">
             <span v-if="row.remark">{{ row.remark }}</span>
             <span v-else class="text-light">-</span>

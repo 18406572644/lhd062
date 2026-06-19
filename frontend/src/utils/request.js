@@ -19,8 +19,16 @@ request.interceptors.request.use(
       if (token) {
         config.headers.Authorization = 'Bearer ' + token
       }
+      
+      const currentSpace = localStorage.getItem('currentSpace')
+      if (currentSpace) {
+        const space = JSON.parse(currentSpace)
+        if (space.type === 'family' && space.id) {
+          config.headers['X-Family-ID'] = space.id
+        }
+      }
     } catch (e) {
-      console.warn('读取 token 失败', e)
+      console.warn('读取 token 或空间信息失败', e)
     }
     return config
   },
