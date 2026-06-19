@@ -1,5 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
 let db;
@@ -7,8 +8,14 @@ let db;
 function init() {
   const dbPath = path.join(__dirname, '..', 'data', 'storage.db');
   db = new Database(dbPath);
-  
-  db.pragma('journal_mode = WAL');
+
+  const isDocker = fs.existsSync('/.dockerenv') || process.env.DOCKER_ENV === 'true';
+  if (isDocker) {
+    console.log('🐳 Docker 检测到 Docker 环境，禁用 WAL 模式');
+    db.pragma('journal_mode = DELETE');
+  } else {
+    db.pragma('journal_mode = WAL');
+  }
   db.pragma('foreign_keys = ON');
   
   createTables();

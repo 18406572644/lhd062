@@ -8,6 +8,14 @@ export function getBoxList(params) {
   })
 }
 
+export function searchBoxes(keyword) {
+  return request({
+    url: '/boxes/search',
+    method: 'get',
+    params: { keyword }
+  })
+}
+
 export function getAllBoxes() {
   return request({
     url: '/boxes/all',

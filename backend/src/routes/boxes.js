@@ -69,6 +69,27 @@ router.get('/', authMiddleware, (req, res) => {
   });
 });
 
+router.get('/search', authMiddleware, (req, res) => {
+  const { keyword } = req.query;
+  const db = getDb();
+  const userId = req.user.id;
+
+  if (!keyword) {
+    return res.json({ list: [] });
+  }
+
+  const boxes = db.prepare(`
+    SELECT b.*,
+      (SELECT COUNT(*) FROM items i WHERE i.box_id = b.id) as item_count
+    FROM boxes b
+    WHERE b.user_id = ? AND (b.name LIKE ? OR b.description LIKE ? OR b.location LIKE ?)
+    ORDER BY b.name ASC
+    LIMIT 20
+  `).all(userId, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+
+  res.json({ list: boxes });
+});
+
 router.get('/all', authMiddleware, (req, res) => {
   const db = getDb();
   const boxes = db.prepare(`

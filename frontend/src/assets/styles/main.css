@@ -14,6 +14,8 @@
   --color-danger: #E07A5F;
   --color-success: #81B29A;
   --color-warning: #F2CC8F;
+  --color-primary: #8FC493;
+  --color-primary-rgb: 143, 196, 147;
 }
 
 * {

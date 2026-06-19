@@ -112,7 +112,7 @@
     </el-card>
 
     <el-card>
-      <el-table :data="items" v-loading="loading" stripe @selection-change="handleSelectionChange">
+      <el-table :data="items" v-loading="loading" stripe @selection-change="handleSelectionChange" :row-class-name="getRowClassName">
         <el-table-column type="selection" width="55" />
         <el-table-column label="图片" width="80" align="center">
           <template #default="{ row }">
@@ -479,7 +479,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ArrowDown, Location, ShoppingCart, Picture, PictureFilled, Close, ZoomIn, Warning } from '@element-plus/icons-vue'
@@ -518,6 +518,7 @@ const borrowForm = reactive({
 const selectedItems = ref([])
 const shoppingLists = ref([])
 const showAddToListDialog = ref(false)
+const highlightId = ref(null)
 const addToListLoading = ref(false)
 let singleAddItem = null
 const addToListForm = reactive({
@@ -629,6 +630,8 @@ async function loadList() {
     if (activeTab.value === 'all') {
       loadRestockCount()
     }
+    
+    scrollToHighlightedItem()
   } finally {
     loading.value = false
   }
@@ -668,7 +671,27 @@ function resetFilters() {
   filters.need_restock = false
   activeTab.value = 'all'
   pagination.page = 1
+  highlightId.value = null
   loadList()
+}
+
+function getRowClassName({ row }) {
+  if (highlightId.value && row.id === highlightId.value) {
+    return 'highlight-row'
+  }
+  return ''
+}
+
+async function scrollToHighlightedItem() {
+  if (!highlightId.value) return
+  await nextTick()
+  const row = document.querySelector('.highlight-row')
+  if (row) {
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      highlightId.value = null
+    }, 3000)
+  }
 }
 
 function handleAdd() {
@@ -1004,12 +1027,15 @@ async function generateRestockList() {
   }
 }
 
-onMounted(() => {
+function handleRouteQuery() {
   if (route.query.keyword) {
     filters.keyword = route.query.keyword
   }
   if (route.query.box_id) {
     filters.box_id = route.query.box_id
+  }
+  if (route.query.highlightId) {
+    highlightId.value = parseInt(route.query.highlightId)
   }
   if (route.query.need_restock === 'true') {
     activeTab.value = 'need_restock'
@@ -1028,11 +1054,25 @@ onMounted(() => {
     activeTab.value = 'expire_soon'
     filters.expire_soon = true
   }
+}
+
+onMounted(() => {
+  handleRouteQuery()
   loadCategories()
   loadBoxes()
   loadList()
   loadShoppingLists()
 })
+
+watch(
+  () => route.query,
+  () => {
+    handleRouteQuery()
+    if (route.query.highlightId) {
+      loadList()
+    }
+  }
+)
 </script>
 
 <style scoped>
@@ -1216,5 +1256,19 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+:deep(.highlight-row) {
+  background-color: rgba(var(--color-primary-rgb), 0.15) !important;
+  animation: highlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% {
+    background-color: rgba(var(--color-primary-rgb), 0.15);
+  }
+  50% {
+    background-color: rgba(var(--color-primary-rgb), 0.3);
+  }
 }
 </style>
