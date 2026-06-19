@@ -5,7 +5,7 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', authMiddleware, (req, res) => {
-  const { page = 1, pageSize = 10, keyword, category, box_id, status, expire_soon } = req.query;
+  const { page = 1, pageSize = 10, keyword, category, box_id, status, expire_soon, low_stock } = req.query;
   const db = getDb();
   const userId = req.user.id;
 
@@ -34,6 +34,10 @@ router.get('/', authMiddleware, (req, res) => {
 
   if (expire_soon === 'true') {
     whereClause += ' AND i.expire_date IS NOT NULL AND i.expire_date <= date("now", "+30 days") AND i.expire_date >= date("now")';
+  }
+
+  if (low_stock === 'true') {
+    whereClause += ' AND i.quantity <= 2';
   }
 
   const total = db.prepare(`SELECT COUNT(*) as count FROM items i ${whereClause}`).get(...params).count;

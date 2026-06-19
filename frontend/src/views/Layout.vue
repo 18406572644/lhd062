@@ -95,6 +95,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/labels')) return '/labels'
   if (path.startsWith('/records')) return '/records'
   if (path.startsWith('/expiring')) return '/expiring'
+  if (path.startsWith('/shopping')) return '/shopping'
   return path
 })
 
@@ -104,7 +105,8 @@ const menuItems = [
   { path: '/items', title: '物品管理', icon: 'Goods' },
   { path: '/labels', title: '标签打印', icon: 'Postcard' },
   { path: '/records', title: '存取记录', icon: 'Document' },
-  { path: '/expiring', title: '过期提醒', icon: 'Warning' }
+  { path: '/expiring', title: '过期提醒', icon: 'Warning' },
+  { path: '/shopping', title: '购物清单', icon: 'ShoppingCart' }
 ]
 
 function handleSearch() {

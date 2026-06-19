@@ -31,13 +31,30 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     return response.data
   },
-  (error) => {
+  async (error) => {
     if (error.response) {
       const { status, data, config } = error.response
       const url = config?.url || ''
       const isWhiteList = WHITE_LIST.some(api => url.includes(api))
+      
+      let errorMessage = '请求失败'
+      
+      if (config.responseType === 'blob' && data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const json = JSON.parse(text)
+          errorMessage = json.message || errorMessage
+        } catch (e) {
+          errorMessage = `请求失败 (${status})`
+        }
+      } else {
+        errorMessage = data?.message || errorMessage
+      }
       
       if (status === 401 && !isWhiteList) {
         const currentPath = window.location.pathname
@@ -64,12 +81,12 @@ request.interceptors.response.use(
           }
         }
       } else if (status !== 401 && !isWhiteList) {
-        ElMessage.error(data?.message || '请求失败')
+        ElMessage.error(errorMessage)
       } else if (status === 401 && isWhiteList) {
-        ElMessage.error(data?.message || '用户名或密码错误')
+        ElMessage.error(errorMessage || '用户名或密码错误')
       }
       
-      return Promise.reject(new Error(data?.message || `请求失败 (${status})`))
+      return Promise.reject(new Error(errorMessage || `请求失败 (${status})`))
     } else {
       if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
         ElMessage.error('请求超时，请稍后重试')

@@ -62,6 +62,12 @@ const routes = [
         meta: { title: '过期提醒', icon: 'Warning' }
       },
       {
+        path: 'shopping',
+        name: 'Shopping',
+        component: () => import('@/views/Shopping.vue'),
+        meta: { title: '购物清单', icon: 'ShoppingCart' }
+      },
+      {
         path: 'templates',
         name: 'Templates',
         component: () => import('@/views/Templates.vue'),

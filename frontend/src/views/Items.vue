@@ -6,6 +6,14 @@
         物品管理
       </h2>
       <div class="header-actions">
+        <el-button
+          type="warning"
+          :icon="ShoppingCart"
+          :disabled="selectedItems.length === 0"
+          @click="showAddToListDialog = true"
+        >
+          加入购物清单 ({{ selectedItems.length }})
+        </el-button>
         <el-button type="success" :icon="ArrowDown" @click="showBorrowDialog">
           取用登记
         </el-button>
@@ -70,6 +78,17 @@
             <el-option label="已取用" value="borrowed" />
           </el-select>
         </el-form-item>
+        <el-form-item label="库存">
+          <el-select
+            v-model="filters.low_stock"
+            placeholder="全部库存"
+            clearable
+            style="width: 120px"
+            @change="loadList"
+          >
+            <el-option label="库存不足" value="low" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="loadList">搜索</el-button>
           <el-button @click="resetFilters">重置</el-button>
@@ -78,7 +97,8 @@
     </el-card>
 
     <el-card>
-      <el-table :data="items" v-loading="loading" stripe>
+      <el-table :data="items" v-loading="loading" stripe @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="name" label="物品名称" min-width="150">
           <template #default="{ row }">
             <span class="item-name">{{ row.name }}</span>
@@ -120,7 +140,7 @@
             <span v-else class="text-light">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link @click="handleEdit(row)">
               编辑
@@ -141,6 +161,9 @@
               @click="handleReturn(row)"
             >
               归还
+            </el-button>
+            <el-button size="small" type="warning" link @click="addSingleItemToList(row)">
+              购物
             </el-button>
             <el-button size="small" type="danger" link @click="handleDelete(row)">
               删除
@@ -247,6 +270,52 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="showAddToListDialog"
+      title="加入购物清单"
+      width="450px"
+      @close="resetAddToListForm"
+    >
+      <el-form label-width="100px">
+        <el-form-item label="选择清单">
+          <el-select
+            v-model="addToListForm.list_id"
+            placeholder="选择购物清单"
+            style="width: 100%"
+            @change="onListSelectChange"
+          >
+            <el-option
+              v-for="list in shoppingLists"
+              :key="list.id"
+              :label="list.name"
+              :value="list.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="!addToListForm.list_id" label="或新建清单">
+          <el-input
+            v-model="addToListForm.new_list_name"
+            placeholder="输入新清单名称"
+          />
+        </el-form-item>
+        <el-form-item label="补货数量">
+          <el-input-number v-model="addToListForm.quantity" :min="1" />
+          <span style="margin-left: 8px">倍</span>
+        </el-form-item>
+        <el-form-item label="添加数量">
+          <span style="color: var(--color-text-light);">
+            共 {{ selectedItems.length }} 个物品将被添加
+          </span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddToListDialog = false">取消</el-button>
+        <el-button type="primary" :loading="addToListLoading" @click="confirmAddToList">
+          确定添加
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -254,10 +323,11 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowDown, Location } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, Location, ShoppingCart } from '@element-plus/icons-vue'
 import { getItemList, getCategories, createItem, updateItem, deleteItem } from '@/api/items'
 import { getAllBoxes } from '@/api/boxes'
 import { borrowItem, returnItem } from '@/api/records'
+import { getShoppingLists, addFromLowStock, createShoppingList } from '@/api/shopping'
 
 const route = useRoute()
 const formRef = ref()
@@ -277,12 +347,24 @@ const borrowForm = reactive({
   remark: ''
 })
 
+const selectedItems = ref([])
+const shoppingLists = ref([])
+const showAddToListDialog = ref(false)
+const addToListLoading = ref(false)
+let singleAddItem = null
+const addToListForm = reactive({
+  list_id: null,
+  new_list_name: '',
+  quantity: 2
+})
+
 const filters = reactive({
   keyword: '',
   category: '',
   box_id: '',
   status: '',
-  expire_soon: false
+  expire_soon: false,
+  low_stock: ''
 })
 
 const pagination = reactive({
@@ -328,11 +410,13 @@ async function loadList() {
       category: filters.category || undefined,
       box_id: filters.box_id || undefined,
       status: filters.status || undefined,
-      expire_soon: filters.expire_soon || undefined
+      expire_soon: filters.expire_soon || undefined,
+      low_stock: filters.low_stock === 'low' ? true : undefined
     }
     const res = await getItemList(params)
     items.value = res.list
     pagination.total = res.total
+    selectedItems.value = []
   } finally {
     loading.value = false
   }
@@ -354,6 +438,7 @@ function resetFilters() {
   filters.box_id = ''
   filters.status = ''
   filters.expire_soon = false
+  filters.low_stock = ''
   pagination.page = 1
   loadList()
 }
@@ -496,6 +581,78 @@ async function submitBorrow() {
   }
 }
 
+function handleSelectionChange(selection) {
+  selectedItems.value = selection
+}
+
+async function loadShoppingLists() {
+  try {
+    const res = await getShoppingLists()
+    shoppingLists.value = res.list
+    if (res.list.length > 0) {
+      addToListForm.list_id = res.list[0].id
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+function addSingleItemToList(item) {
+  singleAddItem = item
+  addToListForm.list_id = shoppingLists.value.length > 0 ? shoppingLists.value[0].id : null
+  addToListForm.new_list_name = ''
+  addToListForm.quantity = 2
+  showAddToListDialog.value = true
+}
+
+function resetAddToListForm() {
+  singleAddItem = null
+  addToListForm.list_id = shoppingLists.value.length > 0 ? shoppingLists.value[0].id : null
+  addToListForm.new_list_name = ''
+  addToListForm.quantity = 2
+}
+
+function onListSelectChange() {
+  if (addToListForm.list_id) {
+    addToListForm.new_list_name = ''
+  }
+}
+
+async function confirmAddToList() {
+  const itemsToAdd = singleAddItem ? [singleAddItem] : selectedItems.value
+  
+  if (itemsToAdd.length === 0) {
+    ElMessage.warning('请选择要添加的物品')
+    return
+  }
+
+  let listId = addToListForm.list_id
+  
+  try {
+    addToListLoading.value = true
+
+    if (!listId) {
+      if (!addToListForm.new_list_name) {
+        ElMessage.warning('请选择或创建购物清单')
+        return
+      }
+      const res = await createShoppingList({ name: addToListForm.new_list_name })
+      listId = res.list.id
+    }
+
+    const itemIds = itemsToAdd.map(item => item.id)
+    await addFromLowStock({ list_id: listId, item_ids: itemIds })
+    
+    ElMessage.success(`成功添加 ${itemsToAdd.length} 个物品到购物清单`)
+    showAddToListDialog.value = false
+    selectedItems.value = []
+  } catch (error) {
+    console.error(error)
+  } finally {
+    addToListLoading.value = false
+  }
+}
+
 onMounted(() => {
   if (route.query.keyword) {
     filters.keyword = route.query.keyword
@@ -506,6 +663,7 @@ onMounted(() => {
   loadCategories()
   loadBoxes()
   loadList()
+  loadShoppingLists()
 })
 </script>
 

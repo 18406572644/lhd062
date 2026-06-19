@@ -81,6 +81,38 @@ function createTables() {
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (item_id) REFERENCES items(id)
     );
+
+    CREATE TABLE IF NOT EXISTS shopping_lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      is_active INTEGER DEFAULT 1,
+      share_code TEXT UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS shopping_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      list_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      item_id INTEGER,
+      name TEXT NOT NULL,
+      category TEXT,
+      quantity INTEGER DEFAULT 1,
+      unit TEXT DEFAULT '个',
+      purchased INTEGER DEFAULT 0,
+      purchased_at DATETIME,
+      price REAL,
+      remark TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (list_id) REFERENCES shopping_lists(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+    );
   `);
 }
 

@@ -15,6 +15,7 @@ const itemRoutes = require('./routes/items');
 const labelRoutes = require('./routes/labels');
 const recordRoutes = require('./routes/records');
 const statsRoutes = require('./routes/stats');
+const shoppingRoutes = require('./routes/shopping');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,6 +35,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/labels', labelRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/shopping', shoppingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 
