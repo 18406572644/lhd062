@@ -60,3 +60,16 @@ export function deleteItem(id) {
     method: 'delete'
   })
 }
+
+export function uploadItemImage(file) {
+  const formData = new FormData()
+  formData.append('image', file)
+  return request({
+    url: '/items/upload',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
