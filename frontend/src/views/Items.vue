@@ -851,4 +851,113 @@ onMounted(() => {
   justify-content: center;
   margin-top: 20px;
 }
+
+.item-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-light);
+  cursor: pointer;
+  border: 1px solid var(--color-gray);
+  margin: 0 auto;
+}
+
+.item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-thumb .default-icon {
+  font-size: 24px;
+  color: var(--color-text-light);
+}
+
+.image-preview {
+  width: 120px;
+  height: 80px;
+  border: 1px solid var(--color-gray);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.image-remove:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: var(--color-text-light);
+  margin-top: 6px;
+}
+
+.detail-content {
+  padding: 0 10px;
+}
+
+.detail-image {
+  width: 100%;
+  height: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-light);
+  position: relative;
+  cursor: pointer;
+  border: 1px solid var(--color-gray);
+}
+
+.detail-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-image-placeholder {
+  cursor: default;
+  color: var(--color-text-light);
+}
+
+.zoom-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 </style>

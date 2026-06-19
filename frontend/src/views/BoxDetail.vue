@@ -65,6 +65,14 @@
           </template>
 
           <el-table :data="filteredItems" style="width: 100%">
+            <el-table-column label="图片" width="70" align="center">
+              <template #default="{ row }">
+                <div class="item-thumb" @click="handlePreviewImage(row)">
+                  <img v-if="row.image" :src="row.image" :alt="row.name" />
+                  <el-icon v-else class="default-icon"><Picture /></el-icon>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="物品名称" min-width="150">
               <template #default="{ row }">
                 <span class="item-name">{{ row.name }}</span>
@@ -128,6 +136,25 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="itemForm.name" placeholder="请输入物品名称" />
         </el-form-item>
+        <el-form-item label="图片">
+          <el-upload
+            :show-file-list="false"
+            :before-upload="beforeImageUpload"
+            :http-request="handleImageUpload"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+          >
+            <div v-if="itemForm.image" class="image-preview">
+              <img :src="itemForm.image" />
+              <div class="image-remove" @click.stop="removeItemImage">
+                <el-icon><Close /></el-icon>
+              </div>
+            </div>
+            <el-button v-else type="default" :icon="PictureFilled">
+              上传图片
+            </el-button>
+          </el-upload>
+          <div class="upload-tip">支持 JPG/PNG/GIF/WebP 格式，单张不超过 5MB</div>
+        </el-form-item>
         <el-form-item label="分类">
           <el-input v-model="itemForm.category" placeholder="如：食品、日用品" />
         </el-form-item>
@@ -161,6 +188,16 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="imagePreviewVisible"
+      title="图片预览"
+      width="auto"
+      align-center
+      destroy-on-close
+    >
+      <img v-if="previewImageUrl" :src="previewImageUrl" style="max-width: 100%; max-height: 70vh; display: block; margin: 0 auto;" />
+    </el-dialog>
   </div>
 </template>
 
@@ -169,10 +206,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, Edit, Plus, Printer, Location, Grid, Goods, Document, Search
+  ArrowLeft, Edit, Plus, Printer, Location, Grid, Goods, Document, Search, Picture, PictureFilled, Close
 } from '@element-plus/icons-vue'
 import { getBoxDetail, updateBox } from '@/api/boxes'
-import { createItem, updateItem, deleteItem } from '@/api/items'
+import { createItem, updateItem, deleteItem, uploadItemImage } from '@/api/items'
 import { borrowItem, returnItem } from '@/api/records'
 
 const route = useRoute()
@@ -196,6 +233,9 @@ const filteredItems = computed(() => {
   )
 })
 
+const imagePreviewVisible = ref(false)
+const previewImageUrl = ref('')
+
 const itemForm = reactive({
   id: null,
   name: '',
@@ -203,11 +243,47 @@ const itemForm = reactive({
   quantity: 1,
   unit: '个',
   expire_date: '',
-  description: ''
+  description: '',
+  image: ''
 })
 
 const itemRules = {
   name: [{ required: true, message: '请输入物品名称', trigger: 'blur' }]
+}
+
+function handlePreviewImage(item) {
+  if (item.image) {
+    previewImageUrl.value = item.image
+    imagePreviewVisible.value = true
+  }
+}
+
+function beforeImageUpload(file) {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    ElMessage.error('只支持 JPG/PNG/GIF/WebP 格式的图片')
+    return false
+  }
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isLt5M) {
+    ElMessage.error('图片大小不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+async function handleImageUpload(options) {
+  try {
+    const res = await uploadItemImage(options.file)
+    itemForm.image = res.imageUrl
+    ElMessage.success('上传成功')
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+function removeItemImage() {
+  itemForm.image = ''
 }
 
 async function loadDetail() {
@@ -243,6 +319,7 @@ function handleEditItem(item) {
   itemForm.unit = item.unit || '个'
   itemForm.expire_date = item.expire_date
   itemForm.description = item.description
+  itemForm.image = item.image || ''
   itemDialogVisible.value = true
 }
 
@@ -255,6 +332,7 @@ function resetItemForm() {
   itemForm.unit = '个'
   itemForm.expire_date = ''
   itemForm.description = ''
+  itemForm.image = ''
 }
 
 async function handleItemSubmit() {
@@ -407,5 +485,71 @@ onMounted(() => {
 .empty-icon {
   font-size: 48px;
   margin-bottom: 12px;
+}
+
+.item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-light);
+  cursor: pointer;
+  border: 1px solid var(--color-gray);
+  margin: 0 auto;
+}
+
+.item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-thumb .default-icon {
+  font-size: 20px;
+  color: var(--color-text-light);
+}
+
+.image-preview {
+  width: 120px;
+  height: 80px;
+  border: 1px solid var(--color-gray);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.image-remove:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: var(--color-text-light);
+  margin-top: 6px;
 }
 </style>

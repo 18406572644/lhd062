@@ -60,6 +60,14 @@
       </template>
       <el-table :data="expiredItems" stripe @selection-change="handleExpiredSelection">
         <el-table-column type="selection" width="55" />
+        <el-table-column label="图片" width="70" align="center">
+          <template #default="{ row }">
+            <div class="item-thumb">
+              <img v-if="row.image" :src="row.image" :alt="row.name" />
+              <el-icon v-else class="default-icon"><Picture /></el-icon>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="物品名称" min-width="150" />
         <el-table-column prop="box_name" label="所在收纳盒" min-width="150">
           <template #default="{ row }">
@@ -109,6 +117,14 @@
 
       <el-table :data="expiringItems" v-loading="loading" stripe @selection-change="handleExpiringSelection">
         <el-table-column type="selection" width="55" />
+        <el-table-column label="图片" width="70" align="center">
+          <template #default="{ row }">
+            <div class="item-thumb">
+              <img v-if="row.image" :src="row.image" :alt="row.name" />
+              <el-icon v-else class="default-icon"><Picture /></el-icon>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="物品名称" min-width="150">
           <template #default="{ row }">
             <span class="item-name">{{ row.name }}</span>
@@ -213,7 +229,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Warning, WarningFilled, CircleClose, Location, ShoppingCart
+  Warning, WarningFilled, CircleClose, Location, ShoppingCart, Picture
 } from '@element-plus/icons-vue'
 import { getExpiringItems } from '@/api/items'
 import { getShoppingLists, addFromExpiring, createShoppingList, addShoppingItem } from '@/api/shopping'
@@ -429,5 +445,29 @@ onMounted(() => {
 .empty-icon {
   font-size: 48px;
   margin-bottom: 12px;
+}
+
+.item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-light);
+  border: 1px solid var(--color-gray);
+  margin: 0 auto;
+}
+
+.item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-thumb .default-icon {
+  font-size: 20px;
+  color: var(--color-text-light);
 }
 </style>
