@@ -292,6 +292,12 @@
             value-format="YYYY-MM-DD"
           />
         </el-form-item>
+        <el-form-item label="体积估算">
+          <el-input-number v-model="form.estimated_size" :min="0" :precision="2" :step="100" />
+          <span style="margin-left: 8px; color: var(--color-text-light); font-size: 12px">
+            cm³，用于空间利用率计算（选填）
+          </span>
+        </el-form-item>
         <el-form-item label="描述">
           <el-input
             v-model="form.description"
@@ -545,6 +551,7 @@ const form = reactive({
   unit: '个',
   min_stock: 0,
   expire_date: '',
+  estimated_size: 0,
   description: '',
   image: ''
 })
@@ -726,6 +733,7 @@ function handleEdit(item) {
   form.unit = item.unit || '个'
   form.min_stock = item.min_stock || 0
   form.expire_date = item.expire_date
+  form.estimated_size = item.estimated_size || 0
   form.description = item.description
   form.image = item.image || ''
   dialogVisible.value = true
@@ -741,6 +749,7 @@ function resetForm() {
   form.unit = '个'
   form.min_stock = 0
   form.expire_date = ''
+  form.estimated_size = 0
   form.description = ''
   form.image = ''
 }

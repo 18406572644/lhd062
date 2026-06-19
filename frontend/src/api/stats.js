@@ -35,3 +35,41 @@ export function getLocationStats() {
     method: 'get'
   })
 }
+
+export function getUsageFrequency(days = 30) {
+  return request({
+    url: '/stats/usage-frequency',
+    method: 'get',
+    params: { days }
+  })
+}
+
+export function getSpaceUtilization() {
+  return request({
+    url: '/stats/space-utilization',
+    method: 'get'
+  })
+}
+
+export function getHeatmapData(weeks = 4) {
+  return request({
+    url: '/stats/heatmap-data',
+    method: 'get',
+    params: { weeks }
+  })
+}
+
+export function getSeasonalAnalysis() {
+  return request({
+    url: '/stats/seasonal-analysis',
+    method: 'get'
+  })
+}
+
+export function getSmartSuggestions(days = 30) {
+  return request({
+    url: '/stats/smart-suggestions',
+    method: 'get',
+    params: { days }
+  })
+}

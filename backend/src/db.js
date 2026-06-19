@@ -35,6 +35,11 @@ function migrateTables() {
     db.exec('ALTER TABLE items ADD COLUMN need_restock INTEGER DEFAULT 0');
     console.log('迁移完成：items 表已添加 need_restock 列');
   }
+  const hasEstimatedSize = columns.some(col => col.name === 'estimated_size');
+  if (!hasEstimatedSize) {
+    db.exec('ALTER TABLE items ADD COLUMN estimated_size REAL DEFAULT 0');
+    console.log('迁移完成：items 表已添加 estimated_size 列');
+  }
 }
 
 function createTables() {
@@ -77,6 +82,7 @@ function createTables() {
       status TEXT DEFAULT 'stored',
       min_stock INTEGER DEFAULT 0,
       need_restock INTEGER DEFAULT 0,
+      estimated_size REAL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),

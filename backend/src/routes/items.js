@@ -174,7 +174,7 @@ router.post('/upload', authMiddleware, upload.single('image'), (req, res) => {
 });
 
 router.post('/', authMiddleware, (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, image, min_stock } = req.body;
+  const { name, box_id, category, quantity, unit, expire_date, description, image, min_stock, estimated_size } = req.body;
   const db = getDb();
 
   if (!name) {
@@ -186,8 +186,8 @@ router.post('/', authMiddleware, (req, res) => {
   const needRestock = qty <= minStock && minStock > 0 ? 1 : 0;
 
   const result = db.prepare(`
-    INSERT INTO items (user_id, box_id, name, category, quantity, unit, expire_date, description, image, min_stock, need_restock)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO items (user_id, box_id, name, category, quantity, unit, expire_date, description, image, min_stock, need_restock, estimated_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.user.id,
     box_id || null,
@@ -199,7 +199,8 @@ router.post('/', authMiddleware, (req, res) => {
     description || '',
     image || null,
     minStock,
-    needRestock
+    needRestock,
+    estimated_size || 0
   );
 
   const item = db.prepare('SELECT * FROM items WHERE id = ?').get(result.lastInsertRowid);
@@ -207,7 +208,7 @@ router.post('/', authMiddleware, (req, res) => {
 });
 
 router.put('/:id', authMiddleware, (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, status, image, min_stock } = req.body;
+  const { name, box_id, category, quantity, unit, expire_date, description, status, image, min_stock, estimated_size } = req.body;
   const db = getDb();
   const itemId = req.params.id;
 
@@ -222,7 +223,7 @@ router.put('/:id', authMiddleware, (req, res) => {
 
   db.prepare(`
     UPDATE items 
-    SET name = ?, box_id = ?, category = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, min_stock = ?, need_restock = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, box_id = ?, category = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, min_stock = ?, need_restock = ?, estimated_size = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND user_id = ?
   `).run(
     name,
@@ -236,6 +237,7 @@ router.put('/:id', authMiddleware, (req, res) => {
     image || null,
     minStock,
     needRestock,
+    estimated_size || 0,
     itemId,
     req.user.id
   );
