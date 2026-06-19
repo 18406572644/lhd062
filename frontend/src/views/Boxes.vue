@@ -38,7 +38,8 @@
     </el-card>
 
     <div v-if="loading" class="loading-state">
-      <el-loading />
+      <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+      <p>加载中...</p>
     </div>
 
     <div v-else-if="boxes.length === 0" class="empty-state">
@@ -111,12 +112,12 @@
           <el-input v-model="form.location" placeholder="如：客厅电视柜左侧" />
         </el-form-item>
         <el-form-item label="尺寸">
-          <el-input-group>
+          <div style="display: flex; gap: 8px; align-items: center;">
             <el-input v-model.number="form.width" placeholder="宽" style="width: 100px" />
             <el-input v-model.number="form.height" placeholder="高" style="width: 100px" />
             <el-input v-model.number="form.depth" placeholder="深" style="width: 100px" />
-            <span style="margin-left: 8px; color: var(--color-text-light)">cm</span>
-          </el-input-group>
+            <span style="color: var(--color-text-light)">cm</span>
+          </div>
         </el-form-item>
         <el-form-item label="颜色">
           <el-color-picker v-model="form.color" show-alpha />
@@ -159,7 +160,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Location, Goods, Grid, PictureFilled } from '@element-plus/icons-vue'
+import { Plus, Location, Goods, Grid, PictureFilled, Loading } from '@element-plus/icons-vue'
 import { getBoxList, createBox, updateBox, deleteBox, uploadBoxImage } from '@/api/boxes'
 
 const router = useRouter()

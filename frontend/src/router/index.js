@@ -83,12 +83,21 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+  let token = ''
+  try {
+    token = localStorage.getItem('token') || ''
+  } catch (e) {
+    console.warn('读取 token 失败', e)
+    token = ''
+  }
   
-  if (to.meta.requiresAuth && !token) {
-    next('/login')
-  } else if (!to.meta.requiresAuth && token) {
-    next('/')
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false)
+  const isAuthPage = to.path === '/login' || to.path === '/register'
+  
+  if (requiresAuth && !token) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+  } else if (isAuthPage && token) {
+    next('/dashboard')
   } else {
     next()
   }

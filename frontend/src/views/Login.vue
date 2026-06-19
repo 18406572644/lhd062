@@ -72,13 +72,14 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElForm } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const formRef = ref()
 const loading = ref(false)
@@ -93,6 +94,17 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
+onMounted(() => {
+  try {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    userStore.token = ''
+    userStore.user = null
+  } catch (e) {
+    console.warn('清理登录态失败', e)
+  }
+})
+
 async function handleLogin() {
   if (!formRef.value) return
   
@@ -100,11 +112,29 @@ async function handleLogin() {
     await formRef.value.validate()
     loading.value = true
     
-    await userStore.login(form)
-    ElMessage.success('登录成功')
-    router.push('/')
+    const res = await userStore.login(form)
+    
+    if (res && res.token) {
+      try {
+        localStorage.setItem('token', res.token)
+        localStorage.setItem('user', JSON.stringify(res.user))
+      } catch (e) {
+        console.warn('保存 token 失败', e)
+      }
+      
+      ElMessage.success('登录成功')
+      
+      const redirect = route.query.redirect
+      setTimeout(() => {
+        if (redirect && typeof redirect === 'string' && redirect !== '/login') {
+          router.replace(redirect)
+        } else {
+          router.replace('/dashboard')
+        }
+      }, 200)
+    }
   } catch (error) {
-    console.error(error)
+    console.error('登录失败:', error)
   } finally {
     loading.value = false
   }

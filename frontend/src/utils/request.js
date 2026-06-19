@@ -2,18 +2,25 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
-let isRefreshing = false
+let isRedirecting = false
+let lastClearTime = 0
+
+const WHITE_LIST = ['/auth/login', '/auth/register', '/health']
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 10000
+  timeout: 15000
 })
 
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        config.headers.Authorization = 'Bearer ' + token
+      }
+    } catch (e) {
+      console.warn('读取 token 失败', e)
     }
     return config
   },
@@ -28,30 +35,51 @@ request.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      const { status, data } = error.response
+      const { status, data, config } = error.response
+      const url = config?.url || ''
+      const isWhiteList = WHITE_LIST.some(api => url.includes(api))
       
-      if (status === 401) {
-        if (!isRefreshing) {
-          isRefreshing = true
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          const currentPath = router.currentRoute.value.path
-          if (currentPath !== '/login' && currentPath !== '/register') {
+      if (status === 401 && !isWhiteList) {
+        const currentPath = window.location.pathname
+        const isLoginOrRegisterPage = currentPath === '/login' || currentPath === '/register'
+        
+        if (!isLoginOrRegisterPage && !isRedirecting) {
+          const now = Date.now()
+          if (now - lastClearTime > 2000) {
+            lastClearTime = now
+            isRedirecting = true
+            try {
+              localStorage.removeItem('token')
+              localStorage.removeItem('user')
+            } catch (e) {
+              console.warn('清除 token 失败', e)
+            }
+            
             ElMessage.error('登录已过期，请重新登录')
-            router.push('/login')
+            router.replace('/login').finally(() => {
+              setTimeout(() => {
+                isRedirecting = false
+              }, 1500)
+            })
           }
-          setTimeout(() => {
-            isRefreshing = false
-          }, 1000)
         }
-      } else {
-        ElMessage.error(data.message || '请求失败')
+      } else if (status !== 401 && !isWhiteList) {
+        ElMessage.error(data?.message || '请求失败')
+      } else if (status === 401 && isWhiteList) {
+        ElMessage.error(data?.message || '用户名或密码错误')
       }
+      
+      return Promise.reject(new Error(data?.message || `请求失败 (${status})`))
     } else {
-      ElMessage.error('网络连接失败')
+      if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+        ElMessage.error('请求超时，请稍后重试')
+      } else if (typeof window !== 'undefined' && !window.navigator.onLine) {
+        ElMessage.error('网络连接不可用')
+      } else {
+        ElMessage.error('网络连接失败')
+      }
+      return Promise.reject(error)
     }
-    
-    return Promise.reject(error)
   }
 )
 
