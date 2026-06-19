@@ -403,6 +403,10 @@ function goToItems(filterType) {
   router.push({ name: 'Items', query })
 }
 
+function goToItemsByCategory(categoryName) {
+  router.push({ name: 'Items', query: { category: categoryName } })
+}
+
 function getSeasonTagType(season) {
   const map = {
     spring: '',
@@ -462,6 +466,11 @@ function initCharts(categoryData, boxData, trendData) {
           value: item.count
         }))
       }]
+    })
+    categoryChart.on('click', (params) => {
+      if (params.name && params.name !== '未分类') {
+        goToItemsByCategory(params.name)
+      }
     })
   }
 

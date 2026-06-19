@@ -36,30 +36,50 @@ function migrateTables() {
     { name: 'need_restock', type: 'INTEGER', default: '0' },
     { name: 'estimated_size', type: 'REAL', default: '0' },
     { name: 'estimated_value', type: 'REAL', default: '0' },
-    { name: 'owner_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true },
+    { name: 'owner_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true, fallbackDefault: '0', updateSql: 'UPDATE items SET owner_id = user_id WHERE owner_id IS NULL OR owner_id = 0' },
     { name: 'space_type', type: 'TEXT NOT NULL', default: "'private'" },
-    { name: 'space_id', type: 'INTEGER', default: null }
+    { name: 'space_id', type: 'INTEGER', default: null },
+    { name: 'category_id', type: 'INTEGER', default: null }
   ];
 
   itemColumnsToAdd.forEach(col => {
     const hasCol = itemColumns.some(c => c.name === col.name);
     if (!hasCol) {
-      let sql = `ALTER TABLE items ADD COLUMN ${col.name} ${col.type}`;
-      if (col.default !== null) {
-        sql += ` DEFAULT ${col.default}`;
+      try {
+        let sql = `ALTER TABLE items ADD COLUMN ${col.name} ${col.type}`;
+        if (col.default !== null) {
+          sql += ` DEFAULT ${col.default}`;
+        }
+        db.exec(sql);
+        console.log(`迁移完成：items 表已添加 ${col.name} 列`);
+      } catch (e) {
+        if (col.requiresUpdate && col.fallbackDefault) {
+          console.warn(`⚠️ items 表 ${col.name} 列添加失败，尝试降级为可空列...`);
+          const nullableType = col.type.replace(/ NOT NULL/i, '');
+          let sql = `ALTER TABLE items ADD COLUMN ${col.name} ${nullableType}`;
+          if (col.fallbackDefault !== null) {
+            sql += ` DEFAULT ${col.fallbackDefault}`;
+          }
+          db.exec(sql);
+          console.log(`迁移完成：items 表已降级添加 ${col.name} 列（可空）`);
+        } else {
+          throw e;
+        }
       }
-      db.exec(sql);
-      console.log(`迁移完成：items 表已添加 ${col.name} 列`);
-      if (col.requiresUpdate) {
-        db.exec('UPDATE items SET owner_id = user_id WHERE owner_id IS NULL');
-        console.log('迁移完成：items 表 owner_id 字段已初始化');
+      if (col.requiresUpdate && col.updateSql) {
+        try {
+          db.exec(col.updateSql);
+          console.log(`迁移完成：items 表 ${col.name} 字段已初始化`);
+        } catch (u) {
+          console.warn(`⚠️ items 表 ${col.name} 字段初始化跳过：`, u.message);
+        }
       }
     }
   });
 
   const boxColumnsToAdd = [
     { name: 'image', type: 'TEXT', default: null },
-    { name: 'owner_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true },
+    { name: 'owner_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true, fallbackDefault: '0', updateSql: 'UPDATE boxes SET owner_id = user_id WHERE owner_id IS NULL OR owner_id = 0' },
     { name: 'space_type', type: 'TEXT NOT NULL', default: "'private'" },
     { name: 'space_id', type: 'INTEGER', default: null }
   ];
@@ -67,22 +87,41 @@ function migrateTables() {
   boxColumnsToAdd.forEach(col => {
     const hasCol = boxColumns.some(c => c.name === col.name);
     if (!hasCol) {
-      let sql = `ALTER TABLE boxes ADD COLUMN ${col.name} ${col.type}`;
-      if (col.default !== null) {
-        sql += ` DEFAULT ${col.default}`;
+      try {
+        let sql = `ALTER TABLE boxes ADD COLUMN ${col.name} ${col.type}`;
+        if (col.default !== null) {
+          sql += ` DEFAULT ${col.default}`;
+        }
+        db.exec(sql);
+        console.log(`迁移完成：boxes 表已添加 ${col.name} 列`);
+      } catch (e) {
+        if (col.requiresUpdate && col.fallbackDefault) {
+          console.warn(`⚠️ boxes 表 ${col.name} 列添加失败，尝试降级为可空列...`);
+          const nullableType = col.type.replace(/ NOT NULL/i, '');
+          let sql = `ALTER TABLE boxes ADD COLUMN ${col.name} ${nullableType}`;
+          if (col.fallbackDefault !== null) {
+            sql += ` DEFAULT ${col.fallbackDefault}`;
+          }
+          db.exec(sql);
+          console.log(`迁移完成：boxes 表已降级添加 ${col.name} 列（可空）`);
+        } else {
+          throw e;
+        }
       }
-      db.exec(sql);
-      console.log(`迁移完成：boxes 表已添加 ${col.name} 列`);
-      if (col.requiresUpdate) {
-        db.exec('UPDATE boxes SET owner_id = user_id WHERE owner_id IS NULL');
-        console.log('迁移完成：boxes 表 owner_id 字段已初始化');
+      if (col.requiresUpdate && col.updateSql) {
+        try {
+          db.exec(col.updateSql);
+          console.log(`迁移完成：boxes 表 ${col.name} 字段已初始化`);
+        } catch (u) {
+          console.warn(`⚠️ boxes 表 ${col.name} 字段初始化跳过：`, u.message);
+        }
       }
     }
   });
 
   const recordColumnsToAdd = [
-    { name: 'operator_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true },
-    { name: 'operator_name', type: 'TEXT NOT NULL', default: "'未知用户'", requiresUpdate: true },
+    { name: 'operator_id', type: 'INTEGER NOT NULL', default: null, requiresUpdate: true, fallbackDefault: '0', updateSql: 'UPDATE records SET operator_id = user_id WHERE operator_id IS NULL OR operator_id = 0' },
+    { name: 'operator_name', type: 'TEXT NOT NULL', default: "'未知用户'" },
     { name: 'space_type', type: 'TEXT NOT NULL', default: "'private'" },
     { name: 'space_id', type: 'INTEGER', default: null }
   ];
@@ -90,15 +129,34 @@ function migrateTables() {
   recordColumnsToAdd.forEach(col => {
     const hasCol = recordColumns.some(c => c.name === col.name);
     if (!hasCol) {
-      let sql = `ALTER TABLE records ADD COLUMN ${col.name} ${col.type}`;
-      if (col.default !== null) {
-        sql += ` DEFAULT ${col.default}`;
+      try {
+        let sql = `ALTER TABLE records ADD COLUMN ${col.name} ${col.type}`;
+        if (col.default !== null) {
+          sql += ` DEFAULT ${col.default}`;
+        }
+        db.exec(sql);
+        console.log(`迁移完成：records 表已添加 ${col.name} 列`);
+      } catch (e) {
+        if (col.requiresUpdate && col.fallbackDefault) {
+          console.warn(`⚠️ records 表 ${col.name} 列添加失败，尝试降级为可空列...`);
+          const nullableType = col.type.replace(/ NOT NULL/i, '');
+          let sql = `ALTER TABLE records ADD COLUMN ${col.name} ${nullableType}`;
+          if (col.fallbackDefault !== null) {
+            sql += ` DEFAULT ${col.fallbackDefault}`;
+          }
+          db.exec(sql);
+          console.log(`迁移完成：records 表已降级添加 ${col.name} 列（可空）`);
+        } else {
+          throw e;
+        }
       }
-      db.exec(sql);
-      console.log(`迁移完成：records 表已添加 ${col.name} 列`);
-      if (col.requiresUpdate && col.name === 'operator_id') {
-        db.exec('UPDATE records SET operator_id = user_id WHERE operator_id IS NULL');
-        console.log('迁移完成：records 表 operator_id 字段已初始化');
+      if (col.requiresUpdate && col.updateSql) {
+        try {
+          db.exec(col.updateSql);
+          console.log(`迁移完成：records 表 ${col.name} 字段已初始化`);
+        } catch (u) {
+          console.warn(`⚠️ records 表 ${col.name} 字段初始化跳过：`, u.message);
+        }
       }
     }
   });
@@ -264,6 +322,22 @@ function createTables() {
       FOREIGN KEY (list_id) REFERENCES shopping_lists(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      owner_id INTEGER NOT NULL,
+      space_type TEXT NOT NULL DEFAULT 'private',
+      space_id INTEGER,
+      name TEXT NOT NULL,
+      icon TEXT DEFAULT '',
+      color TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (owner_id) REFERENCES users(id)
     );
   `);
 }

@@ -44,6 +44,12 @@ const routes = [
         meta: { title: '物品管理', icon: 'Goods' }
       },
       {
+        path: 'categories',
+        name: 'Categories',
+        component: () => import('@/views/Categories.vue'),
+        meta: { title: '分类管理', icon: 'Folder' }
+      },
+      {
         path: 'labels',
         name: 'Labels',
         component: () => import('@/views/Labels.vue'),

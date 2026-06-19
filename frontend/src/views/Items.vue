@@ -54,15 +54,21 @@
             v-model="filters.category"
             placeholder="全部分类"
             clearable
-            style="width: 150px"
+            style="width: 180px"
             @change="loadList"
           >
             <el-option
               v-for="cat in categories"
-              :key="cat"
-              :label="cat"
-              :value="cat"
-            />
+              :key="cat.id"
+              :label="cat.name"
+              :value="cat.name"
+            >
+              <div class="category-option">
+                <span class="category-option-icon">{{ cat.icon || '📦' }}</span>
+                <span class="category-option-name">{{ cat.name }}</span>
+                <span class="category-option-count">{{ cat.item_count || 0 }}件</span>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="收纳盒">
@@ -139,9 +145,15 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="category" label="分类" width="100">
+        <el-table-column prop="category" label="分类" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.category" size="small" type="info">{{ row.category }}</el-tag>
+            <div v-if="row.category" class="category-tag-wrapper">
+              <span
+                class="category-color-dot"
+                :style="{ backgroundColor: getCategoryColor(row.category) }"
+              ></span>
+              <span class="category-tag-text">{{ row.category }}</span>
+            </div>
             <span v-else class="text-light">-</span>
           </template>
         </el-table-column>
@@ -270,7 +282,30 @@
           </el-select>
         </el-form-item>
         <el-form-item label="分类">
-          <el-input v-model="form.category" placeholder="如：食品、日用品" />
+          <div class="category-select-wrapper">
+            <el-select
+              v-model="form.category"
+              placeholder="选择分类"
+              clearable
+              style="flex: 1"
+              @change="onCategorySelectChange"
+            >
+              <el-option
+                v-for="cat in categories"
+                :key="cat.id"
+                :label="cat.name"
+                :value="cat.name"
+              >
+                <div class="category-option">
+                  <span class="category-option-icon">{{ cat.icon || '📦' }}</span>
+                  <span class="category-option-name">{{ cat.name }}</span>
+                </div>
+              </el-option>
+            </el-select>
+            <el-button :icon="Plus" @click="openNewCategoryDialog">
+              新增
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="数量">
           <el-input-number v-model="form.quantity" :min="0" />
@@ -418,7 +453,13 @@
         <el-descriptions :column="1" border style="margin-top: 20px">
           <el-descriptions-item label="名称">{{ currentItem.name }}</el-descriptions-item>
           <el-descriptions-item label="分类">
-            <el-tag v-if="currentItem.category" size="small" type="info">{{ currentItem.category }}</el-tag>
+            <div v-if="currentItem.category" class="category-tag-wrapper">
+              <span
+                class="category-color-dot"
+                :style="{ backgroundColor: getCategoryColor(currentItem.category) }"
+              ></span>
+              <span class="category-tag-text">{{ currentItem.category }}</span>
+            </div>
             <span v-else class="text-light">-</span>
           </el-descriptions-item>
           <el-descriptions-item label="所在收纳盒">
@@ -481,6 +522,48 @@
     >
       <img v-if="previewImageUrl" :src="previewImageUrl" style="max-width: 100%; max-height: 70vh; display: block; margin: 0 auto;" />
     </el-dialog>
+
+    <el-dialog
+      v-model="showCategoryDialog"
+      title="新增分类"
+      width="420px"
+      @close="showCategoryDialog = false"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="分类名称">
+          <el-input v-model="newCategoryForm.name" placeholder="请输入分类名称" maxlength="20" show-word-limit />
+        </el-form-item>
+        <el-form-item label="图标">
+          <div class="icon-selector">
+            <div
+              v-for="icon in categoryIconOptions"
+              :key="icon"
+              class="icon-option"
+              :class="{ active: newCategoryForm.icon === icon }"
+              @click="newCategoryForm.icon = icon"
+            >
+              {{ icon }}
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="颜色">
+          <div class="color-selector">
+            <div
+              v-for="color in categoryColorOptions"
+              :key="color"
+              class="color-option"
+              :class="{ active: newCategoryForm.color === color }"
+              :style="{ backgroundColor: color }"
+              @click="newCategoryForm.color = color"
+            />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCategoryDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleCreateCategory">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -493,6 +576,7 @@ import { getItemList, getCategories, createItem, updateItem, deleteItem, uploadI
 import { getAllBoxes } from '@/api/boxes'
 import { borrowItem, returnItem } from '@/api/records'
 import { getShoppingLists, addFromLowStock, createShoppingList } from '@/api/shopping'
+import { createCategory, getCategories as getCategoryList } from '@/api/categories'
 
 const route = useRoute()
 const router = useRouter()
@@ -533,6 +617,22 @@ const addToListForm = reactive({
   quantity: 2
 })
 
+const showCategoryDialog = ref(false)
+const newCategoryForm = reactive({
+  name: '',
+  icon: '',
+  color: ''
+})
+const categoryIconOptions = [
+  '📦', '🍎', '🥬', '👕', '📚', '💊', '🧴', '🔧',
+  '🎮', '🎁', '🌸', '🍳', '☕', '🧦', '👟', '💄'
+]
+const categoryColorOptions = [
+  '#B8D8BA', '#D4B896', '#F5E6C8', '#8FC493',
+  '#B8956E', '#FFB6C1', '#87CEEB', '#DDA0DD',
+  '#98FB98', '#FFD700', '#FFA07A', '#20B2AA'
+]
+
 const filters = reactive({
   keyword: '',
   category: '',
@@ -554,6 +654,7 @@ const form = reactive({
   name: '',
   box_id: null,
   category: '',
+  category_id: null,
   quantity: 1,
   unit: '个',
   min_stock: 0,
@@ -575,6 +676,11 @@ const storedItems = computed(() => {
 const restockTabLabel = computed(() => {
   return restockCount.value > 0 ? `待补货 (${restockCount.value})` : '待补货'
 })
+
+function getCategoryColor(categoryName) {
+  const cat = categories.value.find(c => c.name === categoryName)
+  return cat?.color || '#B8D8BA'
+}
 
 function isLowStock(item) {
   if (item.min_stock && item.min_stock > 0) {
@@ -659,8 +765,42 @@ async function loadRestockCount() {
 }
 
 async function loadCategories() {
-  const res = await getCategories()
-  categories.value = res.categories
+  const res = await getCategoryList()
+  categories.value = res.list || []
+}
+
+function openNewCategoryDialog() {
+  newCategoryForm.name = ''
+  newCategoryForm.icon = '📦'
+  newCategoryForm.color = '#B8D8BA'
+  showCategoryDialog.value = true
+}
+
+function onCategorySelectChange(val) {
+  const cat = categories.value.find(c => c.name === val)
+  if (cat) {
+    form.category_id = cat.id
+  } else {
+    form.category_id = null
+  }
+}
+
+async function handleCreateCategory() {
+  if (!newCategoryForm.name?.trim()) {
+    ElMessage.warning('请输入分类名称')
+    return
+  }
+  
+  try {
+    const res = await createCategory(newCategoryForm)
+    ElMessage.success('分类创建成功')
+    showCategoryDialog.value = false
+    await loadCategories()
+    form.category = res.category.name
+    form.category_id = res.category.id
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 async function loadBoxes() {
@@ -759,6 +899,7 @@ function handleEdit(item) {
   form.name = item.name
   form.box_id = item.box_id
   form.category = item.category
+  form.category_id = item.category_id || null
   form.quantity = item.quantity
   form.unit = item.unit || '个'
   form.min_stock = item.min_stock || 0
@@ -776,6 +917,7 @@ function resetForm() {
   form.name = ''
   form.box_id = null
   form.category = ''
+  form.category_id = null
   form.quantity = 1
   form.unit = '个'
   form.min_stock = 0
@@ -1043,6 +1185,9 @@ function handleRouteQuery() {
   if (route.query.box_id) {
     filters.box_id = route.query.box_id
   }
+  if (route.query.category) {
+    filters.category = route.query.category
+  }
   if (route.query.highlightId) {
     highlightId.value = parseInt(route.query.highlightId)
   }
@@ -1279,5 +1424,102 @@ watch(
   50% {
     background-color: rgba(var(--color-primary-rgb), 0.3);
   }
+}
+
+.category-select-wrapper {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.category-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-option-icon {
+  font-size: 16px;
+}
+
+.category-option-name {
+  font-size: 14px;
+}
+
+.category-option-count {
+  font-size: 12px;
+  color: var(--color-text-light);
+  margin-left: auto;
+}
+
+.category-tag-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.category-tag-text {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.icon-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.icon-option {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--color-gray);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  background: var(--color-white);
+}
+
+.icon-option:hover {
+  border-color: var(--color-primary);
+}
+
+.icon-option.active {
+  border-color: var(--color-primary);
+  background-color: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.color-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.color-option {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-white);
 }
 </style>

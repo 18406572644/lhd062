@@ -78,8 +78,8 @@ router.get('/', authMiddleware, familyAuthMiddleware, (req, res) => {
   }
 
   if (category) {
-    whereClause += ' AND i.category = ?';
-    params.push(category);
+    whereClause += ' AND (i.category = ? OR i.category_id = (SELECT id FROM categories WHERE name = ? LIMIT 1))';
+    params.push(category, category);
   }
 
   if (box_id) {
@@ -215,7 +215,7 @@ router.post('/upload', authMiddleware, familyAuthMiddleware, upload.single('imag
 });
 
 router.post('/', authMiddleware, familyAuthMiddleware, requirePermission('manage_items'), (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, image, min_stock, estimated_size, estimated_value } = req.body;
+  const { name, box_id, category, category_id, quantity, unit, expire_date, description, image, min_stock, estimated_size, estimated_value } = req.body;
   const db = getDb();
 
   if (!name) {
@@ -228,9 +228,19 @@ router.post('/', authMiddleware, familyAuthMiddleware, requirePermission('manage
   const spaceType = req.space.type;
   const spaceId = req.space.type === 'family' ? req.space.id : null;
 
+  let categoryName = category || '';
+  let categoryId = category_id || null;
+  
+  if (categoryId) {
+    const cat = db.prepare('SELECT name FROM categories WHERE id = ?').get(categoryId);
+    if (cat) {
+      categoryName = cat.name;
+    }
+  }
+
   const result = db.prepare(`
-    INSERT INTO items (user_id, owner_id, space_type, space_id, box_id, name, category, quantity, unit, expire_date, description, image, min_stock, need_restock, estimated_size, estimated_value)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO items (user_id, owner_id, space_type, space_id, box_id, name, category, category_id, quantity, unit, expire_date, description, image, min_stock, need_restock, estimated_size, estimated_value)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.user.id,
     req.user.id,
@@ -238,7 +248,8 @@ router.post('/', authMiddleware, familyAuthMiddleware, requirePermission('manage
     spaceId,
     box_id || null,
     name,
-    category || '',
+    categoryName,
+    categoryId,
     qty,
     unit || '个',
     expire_date || null,
@@ -255,7 +266,7 @@ router.post('/', authMiddleware, familyAuthMiddleware, requirePermission('manage
 });
 
 router.put('/:id', authMiddleware, familyAuthMiddleware, requirePermission('manage_items'), (req, res) => {
-  const { name, box_id, category, quantity, unit, expire_date, description, status, image, min_stock, estimated_size, estimated_value } = req.body;
+  const { name, box_id, category, category_id, quantity, unit, expire_date, description, status, image, min_stock, estimated_size, estimated_value } = req.body;
   const db = getDb();
   const itemId = req.params.id;
 
@@ -271,10 +282,21 @@ router.put('/:id', authMiddleware, familyAuthMiddleware, requirePermission('mana
   const minStock = min_stock || 0;
   const needRestock = qty <= minStock && minStock > 0 ? 1 : 0;
 
+  let categoryName = category !== undefined ? category : existingItem.category;
+  let categoryId = category_id !== undefined ? category_id : existingItem.category_id;
+  
+  if (categoryId) {
+    const cat = db.prepare('SELECT name FROM categories WHERE id = ?').get(categoryId);
+    if (cat) {
+      categoryName = cat.name;
+    }
+  }
+
   const updateParams = [
     name,
     box_id || null,
-    category || '',
+    categoryName,
+    categoryId,
     qty,
     unit || '个',
     expire_date || null,
@@ -302,7 +324,7 @@ router.put('/:id', authMiddleware, familyAuthMiddleware, requirePermission('mana
 
   db.prepare(`
     UPDATE items 
-    SET name = ?, box_id = ?, category = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, min_stock = ?, need_restock = ?, estimated_size = ?, estimated_value = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, box_id = ?, category = ?, category_id = ?, quantity = ?, unit = ?, expire_date = ?, description = ?, status = ?, image = ?, min_stock = ?, need_restock = ?, estimated_size = ?, estimated_value = ?, updated_at = CURRENT_TIMESTAMP
     ${updateWhere}
   `).run(...updateParams);
 

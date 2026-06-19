@@ -286,6 +286,7 @@ const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/boxes')) return '/boxes'
   if (path.startsWith('/items')) return '/items'
+  if (path.startsWith('/categories')) return '/categories'
   if (path.startsWith('/labels')) return '/labels'
   if (path.startsWith('/records')) return '/records'
   if (path.startsWith('/expiring')) return '/expiring'
@@ -297,6 +298,7 @@ const menuItems = [
   { path: '/dashboard', title: '首页概览', icon: 'HomeFilled' },
   { path: '/boxes', title: '收纳盒管理', icon: 'Box' },
   { path: '/items', title: '物品管理', icon: 'Goods' },
+  { path: '/categories', title: '分类管理', icon: 'Folder' },
   { path: '/labels', title: '标签打印', icon: 'Postcard' },
   { path: '/records', title: '存取记录', icon: 'Document' },
   { path: '/expiring', title: '过期提醒', icon: 'Warning' },

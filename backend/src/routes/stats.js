@@ -20,8 +20,8 @@ function buildSpaceFilter(req, tableAlias = '') {
   }
 
   if (space.type === 'family') {
-    params.push(space.id);
     if (space.role === ROLES.OWNER || space.role === ROLES.ADMIN || space.shareAll) {
+      params.push(space.id);
       return {
         where: `${alias}space_type = 'family' AND ${alias}space_id = ?`,
         params
@@ -53,8 +53,8 @@ function buildItemSpaceFilter(req, tableAlias = '') {
   }
 
   if (space.type === 'family') {
-    params.push(space.id);
     if (space.role === ROLES.OWNER || space.role === ROLES.ADMIN || space.shareAll) {
+      params.push(space.id);
       return {
         where: `${alias}space_type = 'family' AND ${alias}space_id = ?`,
         params
